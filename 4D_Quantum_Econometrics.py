@@ -646,7 +646,7 @@ if estimator == "Compare (all)":
 
 # === Agentic AI Explanations Panel ===
 if enable_ai:
-    st.subheader("Agentic AI — Auto Explanation")
+    st.subheader("Explanation")
     colA, colB = st.columns([1,1])
     with colA:
         explain_btn = st.button("Explain current hyperfield")
