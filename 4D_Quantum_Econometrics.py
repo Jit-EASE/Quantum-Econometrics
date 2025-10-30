@@ -580,7 +580,7 @@ fig.add_trace(go.Scatter3d(
 ))
 
 fig.update_layout(
-    title=" Simulator (Projected Hypersphere)",
+    title="4-Dimensional Quantum-Econometric HyperSpace — Concept (Projected Hypersphere)",
     scene=dict(
         xaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
         yaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
@@ -607,7 +607,7 @@ fig.update_layout(
 # ==============================
 # Streamlit Layout
 # ==============================
-st.title("")
+st.title("4-Dimensional Quantum-Econometric HyperSpace — Concept")
 st.caption("True 4D projection: econometric energy warps a hypersphere (α) and projects to 3D with perspective. Toggle colour source for Residuals / Fitted / Combined.")
 
 if animate:
