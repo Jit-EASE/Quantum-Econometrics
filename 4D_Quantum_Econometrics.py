@@ -460,7 +460,7 @@ st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
 
 # === Agentic AI Explanations Panel ===
 if enable_ai:
-    st.subheader("Agentic AI — Auto Explanation")
+    st.subheader("Agentic AI — Explanation")
     colA, colB = st.columns([1,1])
     with colA:
         explain_btn = st.button("Explain current hyperfield")
