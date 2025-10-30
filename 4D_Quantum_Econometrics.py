@@ -1,6 +1,6 @@
 # Hyperfield_4D_Econometric.py
 # ------------------------------------------------------------
-# True 4D Quantum-Econometric Hyperfield Simulator
+# True  Simulator
 # - 4D coordinate system with econometric-driven hyper-angle
 # - Perspective/orthogonal projection from 4D -> 3D
 # - Residuals, Fitted, or Combined colour source (user toggle)
@@ -22,7 +22,10 @@ try:
 except Exception:
     OpenAI = None  # library may not be installed; we handle gracefully
 
-st.set_page_config(page_title="4D Quantum-Econometric Hyperfield", layout="wide")
+
+st.set_page_config(page_title="4-Dimensional Quantum-Econometric HyperSpace - Concept", layout="wide")
+# Environment key status for Agentic AI
+HAS_OPENAI = bool(os.getenv("OPENAI_API_KEY"))
 
 # ==============================
 # Sidebar — Controls
@@ -45,6 +48,7 @@ bg_color     = st.sidebar.selectbox("Background", ["black","white","rgb(5,5,20)"
 show_axes    = st.sidebar.checkbox("Show Axes", False)
 size_min, size_max = st.sidebar.slider("Marker Size Range", 1, 20, (2, 8), step=1)
 
+
 # Animation
 st.sidebar.markdown("---")
 st.sidebar.subheader("Animation")
@@ -53,13 +57,27 @@ frames_total = st.sidebar.slider("Frames", 10, 360, 120, step=5)
 breathe_amp  = st.sidebar.slider("Breathing Amplitude (3D)", 0.00, 0.60, 0.12, step=0.01)
 rot_speed    = st.sidebar.slider("Rotation Speed (3D)", 0.00, 1.00, 0.20, step=0.01)
 
+# Canvas & Aspect controls
+st.sidebar.markdown("---")
+st.sidebar.subheader("Canvas & Aspect")
+use_container = st.sidebar.checkbox("Fit to container width", True)
+canvas_width  = st.sidebar.number_input("Canvas width (px)", 600, 4000, 1400, step=50)
+canvas_height = st.sidebar.number_input("Canvas height (px)", 400, 3000, 800, step=50)
+manual_aspect = st.sidebar.checkbox("Manual aspect ratio (x:y:z)", True)
+aspect_x = st.sidebar.slider("Aspect X", 0.1, 4.0, 1.4, 0.1)
+aspect_y = st.sidebar.slider("Aspect Y", 0.1, 4.0, 1.0, 0.1)
+aspect_z = st.sidebar.slider("Aspect Z", 0.1, 4.0, 0.8, 0.1)
+
+st.sidebar.subheader("Animation Timing")
+frame_duration_ms = st.sidebar.slider("Frame duration (ms)", 10, 200, 60, step=5)
+
 # 4D Projection Settings
 st.sidebar.markdown("---")
 st.sidebar.subheader("4D Projection Settings")
 projection_intensity = st.sidebar.slider("Projection Intensity λ", 0.10, 5.00, 1.20, 0.10)
 w_rotation_speed     = st.sidebar.slider("4D Rotation Speed ω₄", 0.00, 1.00, 0.15, 0.01)
 color_source_4d      = st.sidebar.selectbox("Color Source (4D View)", ["Residuals","Fitted","Combined"], index=2)
-orthogonal_proj      = st.sidebar.checkbox("Orthogonal Projection (no perspective)", value=False)
+orthogonal_proj      = st.sidebar.checkbox("Orthogonal Projection", value=False)
 
 # Econometrics section
 st.sidebar.markdown("---")
@@ -68,10 +86,29 @@ dep_var = st.sidebar.selectbox("Dependent Variable", ["z","y","x","r"], index=0)
 pred_vars = st.sidebar.multiselect("Predictors (X)", ["x","y","z","r","theta","phi"], default=["x","y","r"])
 use_robust = st.sidebar.checkbox("White Robust SE (HC1)", True)
 
+# ---------------------------------------------------
+# Estimator selector & advanced model controls
+st.sidebar.markdown("---")
+st.sidebar.subheader("Estimator")
+estimator = st.sidebar.selectbox("Active model", ["OLS","QKR (quantum kernel)","QUBO selector","Compare (all)"], index=0)
+
+# QKR hyperparameters
+with st.sidebar.expander("QKR settings"):
+    qkr_gamma = st.slider("γ (feature scale)", 0.05, 5.0, 0.8, 0.05)
+    qkr_depth = st.slider("Depth (layers)", 1, 6, 3, 1)
+    qkr_ridge = st.slider("Ridge α", 0.0, 5.0, 0.1, 0.05)
+    qkr_seed  = st.number_input("Random seed", 0, 1_000_000, 4242, 1)
+
+# QUBO-like subset selector
+with st.sidebar.expander("QUBO selector settings"):
+    qubo_lambda = st.slider("λ sparsity penalty", 0.0, 5.0, 1.0, 0.1)
+    qubo_max_p  = st.slider("Max predictors (enumerate)", 2, 12, min(12, len(pred_vars)), 1)
+    qubo_criterion = st.selectbox("Criterion", ["AIC","BIC"], index=0)
+
 # Modeling options
 st.sidebar.subheader("Modeling Options")
 standardize   = st.sidebar.checkbox("Standardize predictors (z-score)", True)
-synth_y       = st.sidebar.checkbox("Synthesize Y to target Adj R²", True)
+synth_y       = st.sidebar.checkbox("Simulate Y to target Adj R²", True)
 target_adj_r2 = st.sidebar.slider("Target Adj R²", 0.00, 0.95, 0.40, step=0.01)
 lock_adj      = st.sidebar.checkbox("Lock Adj R² near target (auto-tune noise)", True)
 beta_scale    = st.sidebar.number_input("simulated β scale", 0.0, 10.0, 1.0, step=0.1)
@@ -147,6 +184,83 @@ def _adj_r2_from_XY(Xmat: np.ndarray, Yvec: np.ndarray) -> float:
         return float(adj_tmp)
     except Exception:
         return np.nan
+
+# ==============================
+# Metrics & model helpers
+# ==============================
+
+def compute_metrics(y_true, y_hat, n_params):
+    resid = y_true - y_hat
+    n = len(y_true)
+    k = int(n_params)
+    ss_tot = float(((y_true - y_true.mean())**2).sum())
+    ss_res = float((resid**2).sum())
+    r2 = 1.0 - ss_res / (ss_tot + 1e-12)
+    adj_r2 = 1.0 - (1.0 - r2) * (n - 1) / max(1, (n - k))
+    rmse = math.sqrt(max(ss_res / max(1, n), 0.0))
+    sigma2 = max(ss_res / max(1, n), 1e-12)
+    ll = -0.5 * n * (math.log(2*math.pi*sigma2) + 1)
+    aic = 2*k - 2*ll
+    bic = k*math.log(max(n,1)) - 2*ll
+    return {"r2": r2, "adj_r2": adj_r2, "rmse": rmse, "aic": aic, "bic": bic}
+
+
+def fit_qkr(Xk, Y, gamma=0.8, depth=3, ridge=0.1, seed=4242):
+    """Quantum-inspired kernel ridge via stacked cos/sin random feature maps.
+    Xk: (n, p) without intercept. Returns result dict akin to OLS block.
+    """
+    rng = np.random.default_rng(int(seed))
+    n, p = Xk.shape
+    feats = []
+    for _ in range(int(depth)):
+        W = rng.normal(0.0, gamma, size=(p, p))
+        Z = Xk @ W
+        feats.append(np.cos(Z))
+        feats.append(np.sin(Z))
+    Phi = np.concatenate(feats, axis=1)
+    Phi_i = np.column_stack([np.ones(n), Phi])
+    I = np.eye(Phi_i.shape[1])
+    beta = np.linalg.pinv(Phi_i.T @ Phi_i + ridge * I) @ (Phi_i.T @ Y)
+    yhat = Phi_i @ beta
+    resid = Y - yhat
+    mets = compute_metrics(Y, yhat, n_params=Phi_i.shape[1])
+    return {
+        "beta": beta,
+        "yhat": yhat,
+        "resid": resid,
+        "r2": mets["r2"], "adj_r2": mets["adj_r2"],
+        "rmse": mets["rmse"], "aic": mets["aic"], "bic": mets["bic"],
+        "names": ["Intercept"] + [f"f{i}" for i in range(Phi_i.shape[1]-1)],
+        "n": n, "k": Phi_i.shape[1], "robust": False,
+        "_kind": "QKR"
+    }
+
+
+def fit_qubo_selector(Xk_full, pred_names, Y, lam=1.0, criterion="AIC", max_p=12):
+    """Exhaustive subset selection up to max_p predictors minimizing AIC/BIC + λ|S|."""
+    from itertools import combinations
+    n, p = Xk_full.shape
+    use_idx = list(range(min(int(max_p), p)))
+    best = None
+    for rsel in range(1, len(use_idx)+1):
+        for combo in combinations(use_idx, rsel):
+            Xs = Xk_full[:, combo]
+            Xi = np.column_stack([np.ones(n), Xs])
+            beta = np.linalg.pinv(Xi.T @ Xi) @ (Xi.T @ Y)
+            yhat = Xi @ beta
+            mets = compute_metrics(Y, yhat, n_params=Xi.shape[1])
+            score = (mets["aic"] if criterion == "AIC" else mets["bic"]) + lam * len(combo)
+            if (best is None) or (score < best["score"]):
+                best = {
+                    "beta": beta, "yhat": yhat, "resid": Y - yhat,
+                    "r2": mets["r2"], "adj_r2": mets["adj_r2"],
+                    "rmse": mets["rmse"], "aic": mets["aic"], "bic": mets["bic"],
+                    "names": ["Intercept"] + [pred_names[i] for i in combo],
+                    "n": n, "k": Xi.shape[1], "robust": False,
+                    "score": score, "subset": [pred_names[i] for i in combo],
+                    "_kind": "QUBO"
+                }
+    return best
 
 # ==============================
 # Agentic AI helpers
@@ -249,6 +363,9 @@ else:
     Y = feat_map[dep_var].astype(float)
     dep_label = f"Observed {dep_var}"
 
+# ==============================
+# Model fitting: OLS, QKR, QUBO, and active selection
+# ==============================
 ols_results = None
 if X is not None:
     XtX = X.T @ X
@@ -281,14 +398,52 @@ if X is not None:
         "r2": r2, "adj_r2": adj_r2, "yhat": yhat, "resid": resid,
         "names": ["Intercept"] + pred_vars, "n": n, "k": k, "robust": use_robust
     }
+    # Attach additional metrics for comparison table compatibility
+    try:
+        _mets_ols = compute_metrics(Y, yhat, n_params=k)
+        ols_results.update({
+            "rmse": _mets_ols.get("rmse"),
+            "aic":  _mets_ols.get("aic"),
+            "bic":  _mets_ols.get("bic"),
+        })
+    except Exception:
+        pass
+
+# === Advanced models (QKR / QUBO) and active selection ===
+qkr_results = None
+qubo_results = None
+
+Xk_for_adv, _, _ = build_features(pred_vars, use_standardize=standardize) if (pred_vars and X is not None) else (None, None, None)
+
+if estimator in ("QKR (quantum kernel)", "Compare (all)") and Xk_for_adv is not None:
+    qkr_results = fit_qkr(Xk_for_adv, Y, gamma=qkr_gamma, depth=qkr_depth, ridge=qkr_ridge, seed=qkr_seed)
+
+if estimator in ("QUBO selector", "Compare (all)") and Xk_for_adv is not None:
+    qubo_results = fit_qubo_selector(Xk_for_adv, pred_vars, Y, lam=qubo_lambda, criterion=qubo_criterion, max_p=qubo_max_p)
+
+res_active = None
+active_name = None
+if estimator == "OLS":
+    res_active = ols_results; active_name = "OLS"
+elif estimator == "QKR (quantum kernel)":
+    res_active = qkr_results or ols_results; active_name = "QKR"
+elif estimator == "QUBO selector":
+    res_active = qubo_results or ols_results; active_name = "QUBO"
+else:  # Compare (all)
+    candidates = [("OLS", ols_results), ("QKR", qkr_results), ("QUBO", qubo_results)]
+    candidates = [(n, r) for n, r in candidates if r is not None]
+    if candidates:
+        active_name, res_active = max(candidates, key=lambda t: t[1]["adj_r2"])  # choose best Adj R² by default
+    else:
+        res_active = ols_results; active_name = "OLS"
 
 # ==============================
 # 4D Hyperfield Construction
 # ==============================
 # Econometric energy w: Combined by default = 0.7*resid + 0.3*(fitted - mean)
-if ols_results is not None:
-    resid = ols_results["resid"]
-    fitted = ols_results["yhat"]
+if 'res_active' in globals() and res_active is not None:
+    resid = res_active["resid"]
+    fitted = res_active["yhat"]
     w_combined = 0.7 * resid + 0.3 * (fitted - np.mean(fitted))
     if color_source_4d == "Residuals":
         color_vals = resid
@@ -333,9 +488,9 @@ opacity_scalar = 0.85
 if show_hover:
     deg = 180.0/np.pi
     alpha_deg = (alpha * 180.0 / np.pi)
-    if ols_results is not None:
-        yhat = ols_results["yhat"]
-        resid = ols_results["resid"]
+    if 'res_active' in globals() and res_active is not None:
+        yhat = res_active["yhat"]
+        resid = res_active["resid"]
         hover_text = [
             f"id:{i} | {dep_label} | r:{rv:.2f} | θ:{(th*deg):.1f}° | φ:{(ph*deg):.1f}° | α:{ad:.1f}° | yhat:{yh:.3f} | resid:{rs:.3f}"
             for i, (rv, th, ph, ad, yh, rs) in enumerate(zip(radii, theta, phi, alpha_deg, yhat, resid))
@@ -425,20 +580,24 @@ fig.add_trace(go.Scatter3d(
 ))
 
 fig.update_layout(
-    title="4D Quantum-Econometric Hyperfield Simulator (Projected Hypersphere)",
+    title=" Simulator (Projected Hypersphere)",
     scene=dict(
         xaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
         yaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
         zaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
-        bgcolor=bg_color
+        bgcolor=bg_color,
+        aspectmode=('manual' if manual_aspect else 'data'),
+        aspectratio=dict(x=aspect_x, y=aspect_y, z=aspect_z)
     ),
     paper_bgcolor=bg_color if bg_color != "white" else "white",
     margin=dict(l=0, r=0, b=0, t=50),
+    width=canvas_width,
+    height=canvas_height,
     updatemenus=[dict(
         type='buttons', showactive=False,
         buttons=[
             dict(label='Play', method='animate',
-                 args=[None, {"fromcurrent": True, "frame": {"duration": 60, "redraw": True}, "transition": {"duration": 0}}]),
+                 args=[None, {"fromcurrent": True, "frame": {"duration": int(frame_duration_ms), "redraw": True}, "transition": {"duration": 0}}]),
             dict(label='Pause', method='animate',
                  args=[[None], {"mode": "immediate", "frame": {"duration": 0, "redraw": False}, "transition": {"duration": 0}}])
         ]
@@ -448,7 +607,7 @@ fig.update_layout(
 # ==============================
 # Streamlit Layout
 # ==============================
-st.title("4D Quantum-Econometric Hyperfield")
+st.title("")
 st.caption("True 4D projection: econometric energy warps a hypersphere (α) and projects to 3D with perspective. Toggle colour source for Residuals / Fitted / Combined.")
 
 if animate:
@@ -456,11 +615,37 @@ if animate:
 else:
     st.caption("Animation disabled — static hyper-projection shown.")
 
-st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
+# Agentic AI env banner (compact)
+if enable_ai:
+    if HAS_OPENAI:
+        st.info("Agentic AI: OPENAI_API_KEY detected. Use the button below to generate an explanation.")
+    else:
+        st.warning("Agentic AI: OPENAI_API_KEY not set. Set the environment variable to enable explanations.")
+
+st.plotly_chart(fig, use_container_width=use_container, config={"displaylogo": False})
+
+# === Model comparison panel ===
+if estimator == "Compare (all)":
+    rows = []
+    for name, res in [("OLS", ols_results), ("QKR", qkr_results), ("QUBO", qubo_results)]:
+        if res is None: continue
+        rows.append({
+            "Model": name,
+            "Adj R²": res["adj_r2"],
+            "R²": res["r2"],
+            "RMSE": res["rmse"],
+            "AIC": res["aic"],
+            "BIC": res["bic"],
+            "k": res["k"],
+        })
+    if rows:
+        st.subheader("Model comparison")
+        st.dataframe(pd.DataFrame(rows).sort_values(by=["Adj R²"], ascending=False), use_container_width=True)
+        st.caption("Active model for colour/4D: " + (active_name or "OLS"))
 
 # === Agentic AI Explanations Panel ===
 if enable_ai:
-    st.subheader("Agentic AI — Explanation")
+    st.subheader("Agentic AI — Auto Explanation")
     colA, colB = st.columns([1,1])
     with colA:
         explain_btn = st.button("Explain current hyperfield")
@@ -475,7 +660,7 @@ if enable_ai:
 # Econometrics summary (if available)
 if ols_results is not None:
     st.subheader("Econometrics — OLS Summary")
-    st.caption(f"Dependent: {dep_label} • Standardize: {'ON' if standardize else 'OFF'} • Robust SE: {'HC1' if use_robust else 'Classical'} • Colour: {color_source_4d}")
+    st.caption(f"Dependent: {dep_label} • Standardize: {'ON' if standardize else 'OFF'} • Robust SE: {'HC1' if use_robust else 'Classical'} • Colour: {color_source_4d} • Estimator: {active_name or estimator}")
     c1, c2, c3 = st.columns(3)
     c1.metric("n (rows)", f"{ols_results['n']}")
     c2.metric("k (params)", f"{ols_results['k']}")
