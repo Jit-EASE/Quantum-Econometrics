@@ -4,7 +4,7 @@
 # - 4D coordinate system with econometric-driven hyper-angle
 # - Perspective/orthogonal projection from 4D -> 3D
 # - Residuals, Fitted, or Combined colour source (user toggle)
-# - OLS with optional robust SE, standardization, Simulated Y targeting Adj R²
+# - OLS with optional robust SE, standardization, simulated Y targeting Adj R²
 # - Streamlit + Plotly with animation (3D rotation + 4D precession)
 # ------------------------------------------------------------
 
@@ -14,6 +14,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.colors import sample_colorscale
+import os
 
 # --- OpenAI Agentic Explanations ---
 try:
@@ -73,7 +74,7 @@ standardize   = st.sidebar.checkbox("Standardize predictors (z-score)", True)
 synth_y       = st.sidebar.checkbox("Synthesize Y to target Adj R²", True)
 target_adj_r2 = st.sidebar.slider("Target Adj R²", 0.00, 0.95, 0.40, step=0.01)
 lock_adj      = st.sidebar.checkbox("Lock Adj R² near target (auto-tune noise)", True)
-beta_scale    = st.sidebar.number_input("Simulated β scale", 0.0, 10.0, 1.0, step=0.1)
+beta_scale    = st.sidebar.number_input("simulated β scale", 0.0, 10.0, 1.0, step=0.1)
 beta_seed     = st.sidebar.number_input("β Random Seed", 0, 1_000_000, 777, step=1)
 
 show_hover = st.sidebar.checkbox("Show Hover Info", True)
@@ -82,7 +83,6 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Agentic AI Explanations")
 enable_ai = st.sidebar.checkbox("Enable OpenAI Explanations", value=False)
 ai_model  = st.sidebar.selectbox("Model", ["gpt-4o-mini","gpt-4o","gpt-4.1-mini"], index=0)
-ai_key    = st.sidebar.text_input("OpenAI API Key", value="", type="password", help="Key not stored; used only for this session.")
 ai_max_tokens = st.sidebar.slider("Max tokens", 128, 2048, 512, step=64)
 
 st.sidebar.caption("Tip: Toggle colour source to switch between Residuals, Fitted, or Combined energy.")
@@ -185,11 +185,14 @@ def _state_summary_for_prompt():
     return summary
 
 
-def _call_openai_explain(api_key: str, model: str, max_tokens: int, narrative_goal: str = "Explain the current hyperfield succinctly for a mixed technical audience."):
-    if not api_key or OpenAI is None:
-        return "OpenAI client not available. Provide an API key and ensure the openai package is installed."
+def _call_openai_explain(model: str, max_tokens: int, narrative_goal: str = "Explain the current hyperfield succinctly for a mixed technical audience."):
+    if OpenAI is None:
+        return "OpenAI client not available. Please install the 'openai' package."
+    # Read API key from environment (no UI collection)
+    if not os.getenv("OPENAI_API_KEY"):
+        return "OpenAI API key not found. Set OPENAI_API_KEY in your environment."
     try:
-        client = OpenAI(api_key=api_key)
+        client = OpenAI()  # reads key from env automatically
         summary = _state_summary_for_prompt()
         # Keep prompt compact and deterministic; no chain-of-thought disclosure
         user_msg = (
@@ -241,7 +244,7 @@ if synth_y and X is not None and len(pred_vars) > 0:
             var_e = var_e * 1.5 if adj_now > target_adj_r2 else var_e / 1.5
         else:
             Y = Y_try
-    dep_label = f"Simulated Y (Adj R²≈{_adj_r2_from_XY(X, Y):.2f}, target {target_adj_r2:.2f})"
+    dep_label = f"simulated Y (Adj R²≈{_adj_r2_from_XY(X, Y):.2f}, target {target_adj_r2:.2f})"
 else:
     Y = feat_map[dep_var].astype(float)
     dep_label = f"Observed {dep_var}"
@@ -465,9 +468,9 @@ if enable_ai:
         narr_goal = st.text_input("Narrative goal (optional)", "Explain insights for a policy+analytics audience.")
     if explain_btn:
         with st.spinner("Generating explanation..."):
-            txt = _call_openai_explain(ai_key, ai_model, ai_max_tokens, narrative_goal=narr_goal)
+            txt = _call_openai_explain(ai_model, ai_max_tokens, narrative_goal=narr_goal)
         st.write(txt)
-    st.caption("Notes: Your key is used only to call OpenAI right now and is not stored.")
+    st.caption("Notes: Uses the OPENAI_API_KEY environment variable only. No keys are collected or stored by this app.")
 
 # Econometrics summary (if available)
 if ols_results is not None:
