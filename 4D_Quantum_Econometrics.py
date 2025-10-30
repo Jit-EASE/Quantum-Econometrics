@@ -580,7 +580,7 @@ fig.add_trace(go.Scatter3d(
 ))
 
 fig.update_layout(
-    title="4-Dimensional Quantum-Econometric HyperSpace — Concept (Projected Hypersphere)",
+    title="4-Dimensional Quantum-Econometric HyperSpace — Concept (Projected Hypersphere) - Developed by Shubhojit Bagchi",
     scene=dict(
         xaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
         yaxis=dict(visible=show_axes, showgrid=False, zeroline=False),
