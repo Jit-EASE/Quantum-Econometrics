@@ -656,7 +656,7 @@ if enable_ai:
         with st.spinner("Generating explanation..."):
             txt = _call_openai_explain(ai_model, ai_max_tokens, narrative_goal=narr_goal)
         st.write(txt)
-    st.caption("Notes: Uses the OPENAI_API_KEY environment variable only. No keys are collected or stored by this app.")
+    
 
 # Econometrics summary (if available)
 if ols_results is not None:
