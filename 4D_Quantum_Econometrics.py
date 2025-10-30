@@ -618,9 +618,9 @@ else:
 # Agentic AI env banner (compact)
 if enable_ai:
     if HAS_OPENAI:
-        st.info("Agentic AI: OPENAI_API_KEY detected. Use the button below to generate an explanation.")
+        st.info("Agentic AI: Active")
     else:
-        st.warning("Agentic AI: OPENAI_API_KEY not set. Set the environment variable to enable explanations.")
+        st.warning("Agentic AI: Inactive Set the environment variable to enable explanations.")
 
 st.plotly_chart(fig, use_container_width=use_container, config={"displaylogo": False})
 
