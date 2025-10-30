@@ -609,7 +609,7 @@ fig.update_layout(
 # ==============================
 st.title("4-Dimensional Quantum-Econometric HyperSpace — Concept")
 st.caption("True 4D projection: econometric energy warps a hypersphere (α) and projects to 3D with perspective. Toggle colour source for Residuals / Fitted / Combined.")
-st.caption("Developed by Shubhojit Bagchi | Inspired by 4 Dimensional Geometry (an extension of Eucleadian Geometry) and Quantum Visualization")
+st.caption("Developed by Shubhojit Bagchi | Inspired by 4 Dimensional Geometry (an extension of Euclidean Geometry) and Quantum Visualization")
 
 if animate:
     st.caption(f"Anim: {frames_total} frames • 3D rot={rot_speed:.2f} • 3D breathe={breathe_amp:.2f} • 4D precession ω₄={w_rotation_speed:.2f} • λ={projection_intensity:.2f}")
